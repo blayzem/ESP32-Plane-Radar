@@ -7,8 +7,11 @@
 namespace config {
 
 // --- Wi-Fi portal ---
-constexpr char kPortalApName[] = "RoundScreen-Setup";
+constexpr char kPortalApName[] = "PlaneRadar-Setup";
 constexpr char kPortalIp[] = "192.168.4.1";
+/** mDNS host (no ".local" suffix); browser: http://plane-radar.local */
+constexpr char kPortalHostname[] = "plane-radar";
+constexpr char kPortalHostUrl[] = "plane-radar.local";
 
 /** Per-attempt STA connect wait (ms); retried kWifiConnectAttempts times. */
 constexpr unsigned long kWifiConnectAttemptMs = 15000;
@@ -41,14 +44,14 @@ constexpr uint32_t kDisplaySpiWriteHz = 40000000;
 constexpr bool kDisplayInvert = true;
 constexpr bool kDisplayRgbOrder = true;
 
-// --- Radar center (receiver / display location) ---
-constexpr double kRadarLat = 52.3676;
-constexpr double kRadarLon = 4.9041;
+// --- Radar center defaults (overridden via WiFi setup portal) ---
+constexpr double kDefaultRadarLat = 52.3676;
+constexpr double kDefaultRadarLon = 4.9041;
 
 /** Poll adsb.fi (API public limit: 1 req/s). */
 constexpr unsigned long kAdsbFetchIntervalMs = 5000;
-/** Fetch radius = outer ring × this (planes render slightly past outer ring). */
-constexpr float kAdsbFetchRadiusScale = 1.25f;
+/** Legacy scale unused — fetch uses radar::fetchRadiusKm() to screen edge. */
+constexpr float kAdsbFetchRadiusScale = 1.0f;
 /** false = hide aircraft with alt_baro "ground"; true = show them too. */
 constexpr bool kAdsbShowGroundAircraft = false;
 

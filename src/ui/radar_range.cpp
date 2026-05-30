@@ -1,29 +1,65 @@
 #include "ui/radar_range.h"
 
+#include "ui/radar_theme.h"
+
 #include <Preferences.h>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 
 namespace ui::radar {
 
 namespace {
 
-constexpr char kPrefsNamespace[] = "roundscreen";
+constexpr char kPrefsNamespace[] = "planeradar";
 constexpr char kPrefsRangeKey[] = "rangeIdx";
-constexpr uint8_t kDefaultRangeIndex = 1;  // 10 km
+constexpr char kPrefsMilesKey[] = "useMiles";
+constexpr uint8_t kDefaultRangeIndex = 1;  // 10 km ring
+constexpr float kKmPerMile = 1.609344f;
 
 Preferences s_prefs;
 uint8_t s_range_index = kDefaultRangeIndex;
+bool s_use_miles = false;
 
 void saveRangeIndex() {
+  if (!s_prefs.begin(kPrefsNamespace, false)) {
+    return;
+  }
   s_prefs.putUChar(kPrefsRangeKey, s_range_index);
+  s_prefs.end();
+}
+
+void saveUseMiles() {
+  if (!s_prefs.begin(kPrefsNamespace, false)) {
+    return;
+  }
+  s_prefs.putBool(kPrefsMilesKey, s_use_miles);
+  s_prefs.end();
+}
+
+bool portalCheckboxChecked(const char* value) {
+  if (value == nullptr || value[0] == '\0') {
+    return false;
+  }
+  // WiFiManager checkbox submits its value= attribute ("T", or "F" if we prefilled F).
+  if ((value[0] == 'T' || value[0] == 't' || value[0] == 'F' || value[0] == 'f') &&
+      value[1] == '\0') {
+    return true;
+  }
+  return strcmp(value, "on") == 0;
 }
 
 }  // namespace
 
 void rangeInit() {
-  s_prefs.begin(kPrefsNamespace, false);
+  if (!s_prefs.begin(kPrefsNamespace, true)) {
+    return;
+  }
   const uint8_t saved = s_prefs.getUChar(kPrefsRangeKey, kDefaultRangeIndex);
   s_range_index =
       (saved < kRangePresetCount) ? saved : kDefaultRangeIndex;
+  s_use_miles = s_prefs.getBool(kPrefsMilesKey, false);
+  s_prefs.end();
 }
 
 void rangeNext() {
@@ -34,5 +70,42 @@ void rangeNext() {
 const RangePreset& rangeCurrent() { return kRangePresets[s_range_index]; }
 
 uint8_t rangeIndex() { return s_range_index; }
+
+float fetchRadiusKm() {
+  const float outer_km = rangeCurrent().outer_km;
+  const float screen_r_px =
+      static_cast<float>(kCenterX - kBeyondRingScreenMarginPx);
+  return outer_km * (screen_r_px / static_cast<float>(kGridOuterRadius));
+}
+
+bool useMiles() { return s_use_miles; }
+
+void saveMilesFromPortal(const char* checkbox_value) {
+  s_use_miles = portalCheckboxChecked(checkbox_value);
+  saveUseMiles();
+  Serial.printf("Distance units: %s\n", s_use_miles ? "miles" : "km");
+}
+
+void formatRing3Label(char* buf, size_t len, float ring3_km, bool use_miles) {
+  if (use_miles) {
+    const int mi = static_cast<int>(lroundf(ring3_km / kKmPerMile));
+    snprintf(buf, len, "%dmi", mi);
+  } else {
+    const int km = static_cast<int>(lroundf(ring3_km));
+    snprintf(buf, len, "%dkm", km);
+  }
+}
+
+void formatCurrentRing3Label(char* buf, size_t len) {
+  formatRing3Label(buf, len, rangeCurrent().ring3_km, s_use_miles);
+}
+
+void unitsReset() {
+  s_use_miles = false;
+  if (s_prefs.begin(kPrefsNamespace, false)) {
+    s_prefs.remove(kPrefsMilesKey);
+    s_prefs.end();
+  }
+}
 
 }  // namespace ui::radar

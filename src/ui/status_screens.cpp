@@ -32,7 +32,11 @@ struct SpinnerDot {
 };
 
 char s_connecting_ssid[33];
-char s_connecting_detail[64];
+constexpr int kConnectingTextMaxWidthPx = 220;
+constexpr int kMaxSsidDisplayLines = 3;
+constexpr size_t kSsidDisplayLineLen = 33;
+char s_ssid_display_lines[kMaxSsidDisplayLines][kSsidDisplayLineLen];
+int s_ssid_display_line_count = 0;
 float s_spinner_angle_deg = -90.0f;
 SpinnerDot s_spinner_dots[kSpinnerDotCount];
 bool s_connecting_text_drawn = false;
@@ -40,6 +44,11 @@ bool s_connecting_text_drawn = false;
 constexpr auto& kGfxTitle = fonts::FreeSans18pt7b;
 constexpr auto& kGfxBody = fonts::FreeSans12pt7b;
 constexpr auto& kGfxDetail = fonts::Font2;
+constexpr auto& kPortalGfxTitle = fonts::FreeSansBold18pt7b;
+constexpr auto& kPortalGfxBody = fonts::FreeSansBold12pt7b;
+constexpr auto& kPortalGfxEmphasis = fonts::FreeSansBold18pt7b;
+constexpr auto& kConnectingGfxTitle = fonts::FreeSansBold12pt7b;
+constexpr auto& kConnectingGfxDetail = fonts::FreeSans9pt7b;
 
 struct TextLine {
   const char* text;
@@ -93,30 +102,98 @@ void drawTextBlock(uint16_t bg, uint16_t fg, const TextLine* lines, size_t count
   }
 }
 
+constexpr float kConnectingTitleVlw = 1.0f;
+constexpr float kConnectingDetailVlw = 0.92f;
+
+void applyConnectingTitleStyle() {
+  if (displayFontIsSmooth()) {
+    tft.setTextSize(kConnectingTitleVlw);
+  } else {
+    tft.setFont(&kConnectingGfxTitle);
+  }
+}
+
+void applyConnectingDetailStyle() {
+  if (displayFontIsSmooth()) {
+    tft.setTextSize(kConnectingDetailVlw);
+  } else {
+    tft.setFont(&kConnectingGfxDetail);
+  }
+}
+
+/** Split SSID into centered lines that fit kConnectingTextMaxWidthPx (detail font). */
+void layoutConnectingSsidLines() {
+  applyConnectingDetailStyle();
+  const char* text = s_connecting_ssid;
+  const size_t len = strlen(text);
+  s_ssid_display_line_count = 0;
+  size_t start = 0;
+  while (start < len && s_ssid_display_line_count < kMaxSsidDisplayLines) {
+    size_t last_fit = start;
+    for (size_t end = start + 1; end <= len; ++end) {
+      const size_t chunk_len = end - start;
+      if (chunk_len >= kSsidDisplayLineLen) {
+        break;
+      }
+      char trial[kSsidDisplayLineLen];
+      memcpy(trial, text + start, chunk_len);
+      trial[chunk_len] = '\0';
+      if (tft.textWidth(trial) <= kConnectingTextMaxWidthPx) {
+        last_fit = end;
+      } else {
+        break;
+      }
+    }
+    size_t take = last_fit - start;
+    if (take == 0) {
+      take = 1;
+    }
+    memcpy(s_ssid_display_lines[s_ssid_display_line_count], text + start, take);
+    s_ssid_display_lines[s_ssid_display_line_count][take] = '\0';
+    ++s_ssid_display_line_count;
+    start += take;
+  }
+  if (s_ssid_display_line_count == 0) {
+    strncpy(s_ssid_display_lines[0], text, kSsidDisplayLineLen - 1);
+    s_ssid_display_lines[0][kSsidDisplayLineLen - 1] = '\0';
+    s_ssid_display_line_count = 1;
+  }
+}
+
 void drawConnectingText() {
   tft.fillScreen(config::kColorBlack);
 
   tft.setTextDatum(textdatum_t::middle_center);
   tft.setTextColor(config::kTextOnBlack, config::kColorBlack);
 
-  tft.setFont(&kGfxTitle);
+  applyConnectingTitleStyle();
   const int title_h = tft.fontHeight();
-  tft.setFont(&kGfxDetail);
+  applyConnectingDetailStyle();
   const int detail_h = tft.fontHeight();
 
-  const int total_h = title_h + kLineGap + detail_h;
+  const int detail_lines = 1 + s_ssid_display_line_count;
+  const int total_h =
+      title_h + kLineGap + detail_h * detail_lines + kLineGap * (detail_lines - 1);
   const int block_top = (config::kDisplayHeight - total_h) / 2;
   constexpr int kPanelPadY = 8;
-  tft.fillRect(kCenterX - 110, block_top - kPanelPadY, 220, total_h + kPanelPadY * 2,
-               config::kColorBlack);
+  tft.fillRect(kCenterX - kConnectingTextMaxWidthPx / 2, block_top - kPanelPadY,
+               kConnectingTextMaxWidthPx, total_h + kPanelPadY * 2, config::kColorBlack);
 
-  tft.setFont(&kGfxTitle);
-  const int title_y = block_top + title_h / 2;
-  tft.drawString("Connecting", kCenterX, title_y);
+  int y = block_top;
+  applyConnectingTitleStyle();
+  tft.drawString("Connecting", kCenterX, y + title_h / 2);
+  y += title_h + kLineGap;
 
-  tft.setFont(&kGfxDetail);
-  const int detail_y = block_top + title_h + kLineGap + detail_h / 2;
-  tft.drawString(s_connecting_detail, kCenterX, detail_y);
+  applyConnectingDetailStyle();
+  tft.drawString("Connecting to", kCenterX, y + detail_h / 2);
+  y += detail_h + kLineGap;
+
+  for (int i = 0; i < s_ssid_display_line_count; ++i) {
+    tft.drawString(s_ssid_display_lines[i], kCenterX, y + detail_h / 2);
+    if (i + 1 < s_ssid_display_line_count) {
+      y += detail_h + kLineGap;
+    }
+  }
 
   s_connecting_text_drawn = true;
 }
@@ -157,8 +234,7 @@ void statusScreenConnectingBegin(const char* ssid) {
   const char* name = (ssid != nullptr && ssid[0] != '\0') ? ssid : "network";
   strncpy(s_connecting_ssid, name, sizeof(s_connecting_ssid) - 1);
   s_connecting_ssid[sizeof(s_connecting_ssid) - 1] = '\0';
-  snprintf(s_connecting_detail, sizeof(s_connecting_detail), "Connecting to %s",
-           s_connecting_ssid);
+  layoutConnectingSsidLines();
   s_spinner_angle_deg = -90.0f;
   for (auto& dot : s_spinner_dots) {
     dot.drawn = false;
@@ -182,11 +258,12 @@ void statusScreenConnectingTick() {
 
 void statusScreenPortal() {
   const TextLine lines[] = {
-      {"Wi-Fi setup", 1.15f, &kGfxTitle},
-      {"1. Join network:", 1.0f, &kGfxBody},
-      {config::kPortalApName, 1.0f, &kGfxBody},
-      {"2. Open in browser:", 1.0f, &kGfxBody},
-      {config::kPortalIp, 1.0f, &kGfxBody},
+      {"Wi-Fi setup", 1.15f, &kPortalGfxTitle},
+      {"1. Join network:", 1.05f, &kPortalGfxBody},
+      {config::kPortalApName, 1.12f, &kPortalGfxEmphasis},
+      {"2. Open in browser:", 1.05f, &kPortalGfxBody},
+      {config::kPortalHostUrl, 1.12f, &kPortalGfxEmphasis},
+      {"or 192.168.4.1", 1.0f, &kPortalGfxBody},
   };
   drawTextBlock(config::kColorYellow, config::kTextOnYellow, lines,
                 sizeof(lines) / sizeof(lines[0]));
@@ -206,8 +283,8 @@ void statusScreenConnectFailed() {
 
 void statusScreenWifiReset() {
   const TextLine lines[] = {
-      {"Wi-Fi reset", 1.15f, &kGfxTitle},
-      {"Restarting...", 1.0f, &kGfxBody},
+      {"Wi-Fi reset", 1.15f, &kPortalGfxTitle},
+      {"Restarting...", 1.05f, &kPortalGfxBody},
   };
   drawTextBlock(config::kColorYellow, config::kTextOnYellow, lines,
                 sizeof(lines) / sizeof(lines[0]));

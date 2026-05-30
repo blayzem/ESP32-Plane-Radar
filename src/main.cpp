@@ -1,5 +1,5 @@
 /**
- * Round-screen — WiFi setup, then radar UI on the round GC9A01 display.
+ * Plane Radar — WiFi setup, then radar UI on the round GC9A01 display.
  */
 
 #include <Arduino.h>
@@ -8,9 +8,11 @@
 #include "config.h"
 #include "hardware/display.h"
 #include "services/adsb_client.h"
+#include "services/radar_location.h"
 #include "services/wifi_setup.h"
 #include "ui/radar_display.h"
 #include "ui/radar_range.h"
+#include "ui/status_screens.h"
 
 namespace {
 
@@ -30,7 +32,9 @@ void showRadarIfConnected() {
 
 void onRangeTap() {
   ui::radar::rangeNext();
-  Serial.printf("Range: %s (outer ~%.0f km)\n", ui::radar::rangeCurrent().ring3_label,
+  char range_label[12];
+  ui::radar::formatCurrentRing3Label(range_label, sizeof(range_label));
+  Serial.printf("Range: %s (outer ~%.0f km)\n", range_label,
                 ui::radar::rangeCurrent().outer_km);
 
   if (g_radar_visible && WiFi.status() == WL_CONNECTED) {
@@ -46,10 +50,9 @@ void handleBootButton() {
 }
 
 void fetchAndDrawAircraft() {
-  const float fetch_km =
-      ui::radar::rangeCurrent().outer_km * config::kAdsbFetchRadiusScale;
-  if (!services::adsb::fetchUpdate(config::kRadarLat, config::kRadarLon,
-                                   fetch_km)) {
+  const float fetch_km = ui::radar::fetchRadiusKm();
+  if (!services::adsb::fetchUpdate(services::location::lat(),
+                                   services::location::lon(), fetch_km)) {
     handleBootButton();
     return;
   }
@@ -63,10 +66,14 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println();
-  Serial.println("round-screen");
+  Serial.println("Plane Radar");
 
   bootButtonInit();
   displayInit();
+  if (wifiShowsSetupScreenOnBoot()) {
+    statusScreenPortal();
+  }
+  services::location::init();
   ui::radar::rangeInit();
   wifiClearCredentialsIfBootHeld();
 

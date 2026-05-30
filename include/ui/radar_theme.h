@@ -12,7 +12,7 @@ constexpr int kCenterY = kSize / 2;
 constexpr int kGridOuterRadius = 107;
 
 /** N: offset from top edge (top_center, negative = up). */
-constexpr int kCardinalNorthOffsetY = -3;
+constexpr int kCardinalNorthOffsetY = -1;
 /** S: offset from bottom edge (bottom_center, positive = down). */
 constexpr int kCardinalSouthOffsetY = 3;
 
@@ -42,8 +42,15 @@ constexpr float kAircraftTrackRefOuterKm = 13.3f;
 constexpr float kAircraftTrackLengthScale = 1.5f / 5.0f;
 /** drawWideLine half-width (1.0 ≈ 2 px total, 1 px thicker than drawLine). */
 constexpr float kAircraftTrackLineHalfWidth = 1.0f;
-/** Gap from triangle edge to tag block (px). */
-constexpr int kAircraftLabelGapPx = 4;
+/** Gap from triangle edge to tag block (px); ~⅓ tighter than 4. */
+constexpr int kAircraftLabelGapPx = 3;
+/** Keep symbol centroid inside outer ring by at least this inset (px). */
+constexpr int kAircraftInsideRingInsetPx =
+    kAircraftNoseLenPx + kAircraftTailHalfPx + 1;
+
+/** Beyond-ring traffic: bearing cues on screen rim (correct direction, fixed radius). */
+constexpr int kBeyondRingDotRadiusPx = 4;
+constexpr int kBeyondRingScreenMarginPx = 2;
 /** Target cap height (px) for aircraft tags (bold, slightly above scale label). */
 constexpr int kAircraftTagLabelHeightPx = 13;
 
@@ -51,9 +58,9 @@ constexpr int kAircraftTagLabelHeightPx = 13;
 constexpr uint8_t kBgR = 4;
 constexpr uint8_t kBgG = 10;
 constexpr uint8_t kBgB = 28;
-constexpr uint8_t kGridR = 20;
-constexpr uint8_t kGridG = 220;
-constexpr uint8_t kGridB = 60;
+constexpr uint8_t kGridR = 16;
+constexpr uint8_t kGridG = 100;
+constexpr uint8_t kGridB = 32;
 constexpr uint8_t kAircraftR = 255;
 constexpr uint8_t kAircraftG = 0;
 constexpr uint8_t kAircraftB = 0;
