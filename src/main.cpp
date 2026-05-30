@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "hardware/display.h"
+#include "services/adsb_client.h"
 #include "services/wifi_setup.h"
 #include "ui/radar_display.h"
 #include "ui/radar_range.h"
@@ -16,10 +17,7 @@ namespace {
 bool g_radar_visible = false;
 unsigned long g_wifi_down_since = 0;
 unsigned long g_last_reconnect_ms = 0;
-
-bool g_boot_down = false;
-unsigned long g_boot_down_at = 0;
-bool g_boot_long_press_handled = false;
+unsigned long g_last_adsb_fetch_ms = 0;
 
 void showRadarIfConnected() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -30,43 +28,33 @@ void showRadarIfConnected() {
   g_radar_visible = true;
 }
 
-void handleBootButton() {
-  if (wifiBootButtonPressed()) {
-    if (!g_boot_down) {
-      g_boot_down = true;
-      g_boot_down_at = millis();
-      g_boot_long_press_handled = false;
-    } else if (!g_boot_long_press_handled &&
-               millis() - g_boot_down_at >= config::kBootResetHoldMs) {
-      g_boot_long_press_handled = true;
-      Serial.println("BOOT held — resetting WiFi");
-      wifiResetCredentialsAndReboot();
-    }
-    return;
-  }
-
-  if (!g_boot_down) {
-    return;
-  }
-
-  const unsigned long held_ms = millis() - g_boot_down_at;
-  g_boot_down = false;
-
-  if (g_boot_long_press_handled) {
-    return;
-  }
-
-  if (held_ms < config::kBootTapMinMs || held_ms >= config::kBootResetHoldMs) {
-    return;
-  }
-
+void onRangeTap() {
   ui::radar::rangeNext();
   Serial.printf("Range: %s (outer ~%.0f km)\n", ui::radar::rangeCurrent().ring3_label,
                 ui::radar::rangeCurrent().outer_km);
 
   if (g_radar_visible && WiFi.status() == WL_CONNECTED) {
-    ui::radarDisplayRefreshRange();
+    ui::radarDisplayDraw();
   }
+}
+
+void handleBootButton() {
+  bootButtonPollLongPress();
+  if (bootButtonConsumeTap()) {
+    onRangeTap();
+  }
+}
+
+void fetchAndDrawAircraft() {
+  const float fetch_km =
+      ui::radar::rangeCurrent().outer_km * config::kAdsbFetchRadiusScale;
+  if (!services::adsb::fetchUpdate(config::kRadarLat, config::kRadarLon,
+                                   fetch_km)) {
+    handleBootButton();
+    return;
+  }
+  ui::radarDisplayRefreshAircraft();
+  handleBootButton();
 }
 
 }  // namespace
@@ -77,6 +65,7 @@ void setup() {
   Serial.println();
   Serial.println("round-screen");
 
+  bootButtonInit();
   displayInit();
   ui::radar::rangeInit();
   wifiClearCredentialsIfBootHeld();
@@ -112,8 +101,11 @@ void loop() {
     g_wifi_down_since = 0;
     if (!g_radar_visible) {
       showRadarIfConnected();
+    } else if (millis() - g_last_adsb_fetch_ms >= config::kAdsbFetchIntervalMs) {
+      g_last_adsb_fetch_ms = millis();
+      fetchAndDrawAircraft();
     }
   }
 
-  delay(50);
+  delay(10);
 }

@@ -41,6 +41,17 @@ constexpr uint32_t kDisplaySpiWriteHz = 40000000;
 constexpr bool kDisplayInvert = true;
 constexpr bool kDisplayRgbOrder = true;
 
+// --- Radar center (receiver / display location) ---
+constexpr double kRadarLat = 52.3676;
+constexpr double kRadarLon = 4.9041;
+
+/** Poll adsb.fi (API public limit: 1 req/s). */
+constexpr unsigned long kAdsbFetchIntervalMs = 5000;
+/** Fetch radius = outer ring × this (planes render slightly past outer ring). */
+constexpr float kAdsbFetchRadiusScale = 1.25f;
+/** false = hide aircraft with alt_baro "ground"; true = show them too. */
+constexpr bool kAdsbShowGroundAircraft = false;
+
 // --- UI colors (RGB565) — status screens ---
 constexpr uint16_t kColorBlack = 0x0000;
 constexpr uint16_t kColorYellow = 0xFFE0;

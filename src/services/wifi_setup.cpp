@@ -8,11 +8,41 @@
 #include "config.h"
 #include "ui/status_screens.h"
 
-namespace {
+portMUX_TYPE s_boot_mux = portMUX_INITIALIZER_UNLOCKED;
+volatile bool s_boot_tap_pending = false;
+volatile bool s_boot_is_down = false;
+volatile unsigned long s_boot_down_ms = 0;
+bool s_long_press_handled = false;
+bool s_boot_interrupt_attached = false;
+
+void IRAM_ATTR onBootButtonIsr() {
+  const bool down = digitalRead(config::kBootPin) == LOW;
+  const unsigned long now = millis();
+  portENTER_CRITICAL_ISR(&s_boot_mux);
+  if (down) {
+    s_boot_is_down = true;
+    s_boot_down_ms = now;
+  } else if (s_boot_is_down) {
+    const unsigned long held = now - s_boot_down_ms;
+    if (held >= config::kBootTapMinMs && held < config::kBootResetHoldMs) {
+      s_boot_tap_pending = true;
+    }
+    s_boot_is_down = false;
+  }
+  portEXIT_CRITICAL_ISR(&s_boot_mux);
+}
 
 void initBootButton() {
   pinMode(config::kBootPin, INPUT_PULLUP);
+  if (s_boot_interrupt_attached) {
+    return;
+  }
+  attachInterrupt(digitalPinToInterrupt(static_cast<uint8_t>(config::kBootPin)),
+                  onBootButtonIsr, CHANGE);
+  s_boot_interrupt_attached = true;
 }
+
+namespace {
 
 bool bootHeldFor(unsigned long hold_ms) {
   if (digitalRead(config::kBootPin) != LOW) {
@@ -118,6 +148,31 @@ bool connectSavedNetwork(bool show_ui) {
 
 bool wifiBootButtonPressed() {
   return digitalRead(config::kBootPin) == LOW;
+}
+
+void bootButtonInit() { initBootButton(); }
+
+bool bootButtonConsumeTap() {
+  portENTER_CRITICAL(&s_boot_mux);
+  const bool tap = s_boot_tap_pending;
+  if (tap) {
+    s_boot_tap_pending = false;
+  }
+  portEXIT_CRITICAL(&s_boot_mux);
+  return tap;
+}
+
+void bootButtonPollLongPress() {
+  if (wifiBootButtonPressed()) {
+    if (!s_long_press_handled &&
+        millis() - s_boot_down_ms >= config::kBootResetHoldMs) {
+      s_long_press_handled = true;
+      Serial.println("BOOT held — resetting WiFi");
+      wifiResetCredentialsAndReboot();
+    }
+  } else {
+    s_long_press_handled = false;
+  }
 }
 
 bool wifiClearCredentialsIfBootHeld() {

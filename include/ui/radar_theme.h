@@ -28,9 +28,52 @@ constexpr int kRingCount = 4;
 
 constexpr int kCenterDotRadius = 2;
 
+/** Filled aircraft symbol (nose triangle). */
+constexpr int kAircraftNoseLenPx = 8;
+constexpr int kAircraftTailLenPx = 3;
+constexpr int kAircraftTailHalfPx = 4;
+/** Track vector: ground distance covered in this many seconds at current gs. */
+constexpr float kAircraftTrackHorizonSec = 60.0f;
+/** Minimum visible vector when gs > 0 (px). */
+constexpr int kAircraftSpeedLineMinPx = 2;
+/** Track line length uses this outer_km, not the active range preset. */
+constexpr float kAircraftTrackRefOuterKm = 13.3f;
+/** Shorter than full 60 s horizon at ref scale; ×1.5 length boost applied. */
+constexpr float kAircraftTrackLengthScale = 1.5f / 5.0f;
+/** drawWideLine half-width (1.0 ≈ 2 px total, 1 px thicker than drawLine). */
+constexpr float kAircraftTrackLineHalfWidth = 1.0f;
+/** Gap from triangle edge to tag block (px). */
+constexpr int kAircraftLabelGapPx = 4;
+/** Target cap height (px) for aircraft tags (bold, slightly above scale label). */
+constexpr int kAircraftTagLabelHeightPx = 13;
+
+/** RGB565 palette targets (applied in initPalette). */
+constexpr uint8_t kBgR = 4;
+constexpr uint8_t kBgG = 10;
+constexpr uint8_t kBgB = 28;
+constexpr uint8_t kGridR = 20;
+constexpr uint8_t kGridG = 220;
+constexpr uint8_t kGridB = 60;
+constexpr uint8_t kAircraftR = 255;
+constexpr uint8_t kAircraftG = 0;
+constexpr uint8_t kAircraftB = 0;
+constexpr uint8_t kTrackR = 255;
+constexpr uint8_t kTrackG = 0;
+constexpr uint8_t kTrackB = 255;
+constexpr uint8_t kTagTypeR = 255;
+constexpr uint8_t kTagTypeG = 200;
+constexpr uint8_t kTagTypeB = 0;
+constexpr uint8_t kTagAltR = 90;
+constexpr uint8_t kTagAltG = 200;
+constexpr uint8_t kTagAltB = 255;
+
 extern uint16_t kColorBackground;
 extern uint16_t kColorGrid;
 extern uint16_t kColorLabel;
 extern uint16_t kColorCenter;
+extern uint16_t kColorAircraft;
+extern uint16_t kColorTrackVector;
+extern uint16_t kColorTagType;
+extern uint16_t kColorTagAltitude;
 
 }  // namespace ui::radar

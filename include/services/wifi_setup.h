@@ -7,3 +7,9 @@ bool wifiSetupConnect();
 /** Reconnect using saved creds; never opens the captive portal. */
 bool wifiReconnect();
 bool wifiBootButtonPressed();
+/** GPIO + interrupt setup; call once early in setup(). */
+void bootButtonInit();
+/** Latched short tap (survives blocking HTTP/display work). */
+bool bootButtonConsumeTap();
+/** Call each loop iteration; triggers WiFi reset on long hold. */
+void bootButtonPollLongPress();

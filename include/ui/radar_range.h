@@ -8,11 +8,10 @@ namespace ui::radar {
 /**
  * Range presets (label on ring 3 = ¾ of outer radius).
  *
- * Recommended for future ADS-B / local traffic on a 1.28″ display:
+ * Recommended for ADS-B on a 1.28″ display:
  *   5 km  — pattern / very local (airfield vicinity)
  *  10 km  — default; neighborhood spotting
- *  25 km  — metro / terminal-area picture
- *  50 km  — regional; fewer icons, wider context
+ *  20 km  — wider metro picture
  *
  * Outer radius (for aircraft math) is ring-3 distance ÷ 0.75.
  */
@@ -24,8 +23,7 @@ struct RangePreset {
 constexpr RangePreset kRangePresets[] = {
     {"5km", 6.7f},
     {"10km", 13.3f},
-    {"25km", 33.3f},
-    {"50km", 66.7f},
+    {"20km", 26.7f},
 };
 
 constexpr size_t kRangePresetCount =
